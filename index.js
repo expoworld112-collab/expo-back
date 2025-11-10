@@ -35,11 +35,18 @@ const port = PORT || 8000;
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: ["https://expo-back.vercel.app", FRONTEND],
-  methods: "GET,POST,PUT,DELETE,PATCH",
-  credentials: true
-}));
+// app.use(cors({
+//   origin: ["https://expo-back.vercel.app", FRONTEND],
+//   methods: "GET,POST,PUT,DELETE,PATCH",
+//   credentials: true
+// }));
+app.use(
+  cors({
+    origin: ["https://expo-front-eight.vercel.app"], // allow only your frontend
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true, // if you need cookies or auth headers
+  })
+);
 app.use(morgan('dev'));
 app.use(bodyParser.json());
 app.use(cookieParser());
