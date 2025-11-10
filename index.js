@@ -36,7 +36,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ["https://expo-back.vercel.app/", FRONTEND],
+  origin: ["https://expo-back.vercel.app", FRONTEND],
   methods: "GET,POST,PUT,DELETE,PATCH",
   credentials: true
 }));
