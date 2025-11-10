@@ -43,7 +43,7 @@ const app = express();
 app.use(
   cors({
     origin: ["https://expo-front-eight.vercel.app"], // allow only your frontend
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET, POST,PUT , DELETE , OPTIONS , PATCH "],
     credentials: true, // if you need cookies or auth headers
   })
 );
