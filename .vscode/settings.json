@@ -1,0 +1,11 @@
+{
+    "json.format.keepLines": true,
+    "emmet.showSuggestionsAsSnippets": true,
+    "emmet.showAbbreviationSuggestions": false,
+    "emmet.preferences": {
+    
+    },
+    "emmet.includeLanguages": {
+        "\"javascript\"": "\"javascriptreact\""
+    }
+}
