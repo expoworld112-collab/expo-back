@@ -1,47 +1,45 @@
-import User from "../models/user.js"
-import Blog from "../models/blog.js"
-import jwt from "jsonwebtoken"
-import _ from "lodash"
-import { expressjwt } from "express-jwt"
+import User from "../models/user.js";
+import Blog from "../models/blog.js";
+import jwt from "jsonwebtoken";
+import _ from "lodash";
+import { expressjwt } from "express-jwt";
 import "dotenv/config.js";
-import { errorHandler } from "../helpers/dbErrorHandler.js"
-import sgMail from "@sendgrid/mail"
-import nodemailer from 'nodemailer';
+import { errorHandler } from "../helpers/dbErrorHandler.js";
+import nodemailer from "nodemailer";
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
+// Configure mail transporter
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    tls: { rejectUnauthorized: false },
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    }
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  tls: { rejectUnauthorized: false },
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
 });
 
-
+// ======================= Pre-signup =======================
 export const preSignup = async (req, res) => {
   try {
     const { name, username, email, password } = req.body;
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ error: 'Email is taken' });
+      return res.status(400).json({ error: "Email is taken" });
     }
 
     const token = jwt.sign(
       { name, username, email, password },
       process.env.JWT_ACCOUNT_ACTIVATION,
-      { expiresIn: '10m' }
+      { expiresIn: "10m" }
     );
 
     const mailOptions = {
       from: process.env.SMTP_USER,
       to: email,
-      subject: 'Account activation link',
-      html: `<p>Click to activate: ${process.env.MAIN_URL}/auth/account/activate/${token}</p>`
+      subject: "Account activation link",
+      html: `<p>Click the link to activate your account: <a href="${process.env.MAIN_URL}/auth/account/activate/${token}">${process.env.MAIN_URL}/auth/account/activate/${token}</a></p>`
     };
 
     await transporter.sendMail(mailOptions);
@@ -49,168 +47,156 @@ export const preSignup = async (req, res) => {
     res.json({
       message: `Email has been sent to ${email}. Follow the instructions to activate your account.`
     });
-
   } catch (err) {
-    console.error('PreSignup Error:', err);
+    console.error("PreSignup Error:", err);
     res.status(400).json({ error: err.message });
   }
 };
 
-
-
+// ======================= Signup =======================
 export const signup = async (req, res) => {
-    const token = req.body.token;
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_ACCOUNT_ACTIVATION);
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ error: "No token provided" });
 
-            if (decoded) {
-                const { name, username, email, password } = jwt.decode(token);
-                const usernameurl = username.toLowerCase();
-                const profile = `${process.env.MAIN_URL}/profile/${usernameurl}`;
-                const user = new User({ name, email, password, profile, username });
-                await user.save();
-                res.json({ message: 'Signup success! Please sign in' });
-            }
-            else { res.status(401).json({ error: 'Expired link. Signup again' }); }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_ACCOUNT_ACTIVATION);
+    const { name, username, email, password } = decoded;
 
-        } catch (err) { res.status(401).json({ error: 'Expired link. Signup again' }); }
-    } else { res.json({ message: 'Something went wrong. Try again' }); }
+    const usernameUrl = username.toLowerCase();
+    const profile = `${process.env.MAIN_URL}/profile/${usernameUrl}`;
+    const user = new User({ name, username, email, password, profile });
+    await user.save();
+
+    res.json({ message: "Signup success! Please sign in" });
+  } catch (err) {
+    console.error("Signup Error:", err);
+    res.status(401).json({ error: "Expired or invalid link. Signup again" });
+  }
 };
 
-
-
+// ======================= Signin =======================
 export const signin = async (req, res) => {
-    const { password } = req.body;
-    try {
-        const user = await User.findOne({ email: req.body.email }).exec();
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email }).exec();
+    if (!user) {
+      return res.status(400).json({ error: "User with that email does not exist. Please sign up." });
+    }
 
-        if (!user) { return res.status(400).json({ error: 'User with that email does not exist. Please sign up.' }); }
-        if (!user.authenticate(password)) { return res.status(400).json({ error: 'Email and password do not match.' }); }
-        const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: '100d' });
-        res.cookie('token', token, { expiresIn: '1d' });
-        const { _id, username, name, email, role } = user;
-        res.json({ token, user: { _id, username, name, email, role } });
-    } catch (err) { res.status(400).json({ error: errorHandler(err) }); }
+    if (!user.authenticate(password)) {
+      return res.status(400).json({ error: "Email and password do not match." });
+    }
+
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "100d" });
+    res.cookie("token", token, { httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }); // 1 day
+
+    const { _id, username, name, email: userEmail, role } = user;
+    res.json({ token, user: { _id, username, name, email: userEmail, role } });
+  } catch (err) {
+    res.status(400).json({ error: errorHandler(err) });
+  }
 };
 
-
-
-
+// ======================= Signout =======================
 export const signout = (req, res) => {
-    res.clearCookie('token');
-    res.json({ message: 'Signout success' });
+  res.clearCookie("token");
+  res.json({ message: "Signout success" });
 };
 
-
+// ======================= Middleware =======================
 export const requireSignin = expressjwt({
-    secret: process.env.JWT_SECRET,
-    algorithms: ["HS256"],
-    userProperty: "auth",
+  secret: process.env.JWT_SECRET,
+  algorithms: ["HS256"],
+  userProperty: "auth"
 });
 
-
-
 export const authMiddleware = async (req, res, next) => {
-    try {
-        const authUserId = req.auth._id;
-        const user = await User.findById({ _id: authUserId }).exec();
+  try {
+    const user = await User.findById(req.auth._id).exec();
+    if (!user) return res.status(400).json({ error: "User not found" });
 
-        if (!user) { return res.status(400).json({ error: 'User not found' }); }
-        req.profile = user;
-        next();
-    } catch (err) { res.status(400).json({ error: errorHandler(err) }); }
+    req.profile = user;
+    next();
+  } catch (err) {
+    res.status(400).json({ error: errorHandler(err) });
+  }
 };
-
-
 
 export const adminMiddleware = async (req, res, next) => {
-    try {
-        const adminUserId = req.auth._id;
-        const user = await User.findById({ _id: adminUserId }).exec();
-        if (!user) { return res.status(400).json({ error: 'User not found' }); }
-        if (user.role !== 1) { return res.status(400).json({ error: 'Admin resource. Access denied' }); }
-        req.profile = user;
-        next();
-    } catch (err) { res.status(400).json({ error: errorHandler(err) }); }
+  try {
+    const user = await User.findById(req.auth._id).exec();
+    if (!user) return res.status(400).json({ error: "User not found" });
+    if (user.role !== 1) return res.status(403).json({ error: "Admin resource. Access denied" });
+
+    req.profile = user;
+    next();
+  } catch (err) {
+    res.status(400).json({ error: errorHandler(err) });
+  }
 };
 
-
-
+// ======================= Blog Authorization =======================
 export const canUpdateDeleteBlog = async (req, res, next) => {
-    try {
-        const slug = req.params.slug.toLowerCase();
-        const data = await Blog.findOne({ slug }).exec();
+  try {
+    const slug = req.params.slug.toLowerCase();
+    const blog = await Blog.findOne({ slug }).exec();
 
-        if (!data) { return res.status(400).json({ error: errorHandler(err) }); }
-        const authorizedUser = data.postedBy._id.toString() === req.profile._id.toString();
+    if (!blog) return res.status(404).json({ error: "Blog not found" });
 
-        if (!authorizedUser) { return res.status(400).json({ error: 'You are not authorized' }); }
-        next();
-    } catch (err) { res.status(400).json({ error: errorHandler(err) }); }
+    const authorized = blog.postedBy._id.toString() === req.profile._id.toString();
+    if (!authorized) return res.status(403).json({ error: "You are not authorized" });
+
+    next();
+  } catch (err) {
+    res.status(400).json({ error: errorHandler(err) });
+  }
 };
 
-
-
+// ======================= Forgot Password =======================
 export const forgotPassword = async (req, res) => {
-    try {
-        const { email } = req.body;
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User with that email does not exist" });
 
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ error: 'User with that email does not exist' });
-        }
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_RESET_PASSWORD, { expiresIn: "10m" });
 
-        const token = jwt.sign(
-            { _id: user._id },
-            process.env.JWT_RESET_PASSWORD,
-            { expiresIn: '10m' }
-        );
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: "Password reset link",
+      html: `<p>Please reset your password using the link below:</p>
+             <p>${process.env.MAIN_URL}/auth/password/reset/${token}</p>
+             <hr /><p>If you did not request this, please ignore this email.</p>`
+    };
 
-        const mailOptions = {
-            from: process.env.SMTP_USER,
-            to: email,
-            subject: 'Password reset link',
-            html: `
-                <p>Please use the following link to reset your password:</p>
-                <p>${process.env.MAIN_URL}/auth/password/reset/${token}</p>
-                <hr />
-                <p>This email may contain sensitive information</p>
-                <p>${process.env.MAIN_URL}</p>
-            `
-        };
+    await user.updateOne({ resetPasswordLink: token });
+    await transporter.sendMail(mailOptions);
 
-        await user.updateOne({ resetPasswordLink: token });
-        await transporter.sendMail(mailOptions);
-
-        res.json({
-            message: `Email has been sent to ${email}. Follow the instructions to reset your password. Link expires in 10 minutes.`
-        });
-
-    } catch (err) {
-        console.log(err);
-        res.status(400).json({ error: errorHandler(err) });
-    }
+    res.json({ message: `Email sent to ${email}. Link expires in 10 minutes.` });
+  } catch (err) {
+    console.error("ForgotPassword Error:", err);
+    res.status(400).json({ error: errorHandler(err) });
+  }
 };
 
-
+// ======================= Reset Password =======================
 export const resetPassword = async (req, res) => {
-    const { resetPasswordLink, newPassword } = req.body;
-    if (resetPasswordLink) {
-        try {
-            const decoded = jwt.verify(resetPasswordLink, process.env.JWT_RESET_PASSWORD);
-            if (decoded) {
-                const user = await User.findOne({ resetPasswordLink });
+  const { resetPasswordLink, newPassword } = req.body;
 
-                if (!user) { return res.status(401).json({ error: 'Something went wrong. Try later' }); }
-                const updatedFields = { password: newPassword, resetPasswordLink: '' };
-                user.set(updatedFields);
-                await user.save();
+  if (!resetPasswordLink) return res.status(400).json({ error: "No reset link provided" });
 
-                res.json({ message: 'Great! Now you can login with your new password' });
-            } else { return res.status(401).json({ error: 'Expired link. Try again' }); }
-        } catch (err) { res.status(400).json({ error: errorHandler(err) }); }
-    }
+  try {
+    const decoded = jwt.verify(resetPasswordLink, process.env.JWT_RESET_PASSWORD);
+    const user = await User.findOne({ resetPasswordLink });
+    if (!user) return res.status(404).json({ error: "Invalid or expired link" });
+
+    user.password = newPassword;
+    user.resetPasswordLink = "";
+    await user.save();
+
+    res.json({ message: "Password reset successful! You can now log in with your new password." });
+  } catch (err) {
+    res.status(400).json({ error: errorHandler(err) });
+  }
 };
-
-

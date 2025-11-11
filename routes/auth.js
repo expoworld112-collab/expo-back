@@ -1,37 +1,80 @@
 import express from "express";
-const router = express.Router();
-import { signup, signin, signout, requireSignin , forgotPassword,resetPassword, preSignup } from "../controllers/auth.js"
-import { runvalidation } from "../validators/index.js"
 import { check } from "express-validator";
+import {
+  signup,
+  signin,
+  signout,
+  requireSignin,
+  forgotPassword,
+  resetPassword,
+  preSignup
+} from "../controllers/auth.js";
+import { runvalidation } from "../validators/index.js";
 
+const router = express.Router();
 
+// ======================= Validators =======================
+
+// Signup validator
 const usersignupvalidator = [
-    check('name').isLength({ min: 5 }).withMessage('Name of more than 5 characters is required '),
-    check('username').isLength({ min: 3, max: 10 }).withMessage('Username of more than 3 and less than 11 characters is required '),
-    check('email').isEmail().withMessage('Must be a valid email address'),
-    check("password", "The password must contain at least 1 lowercase, 1 uppercase, 1 numeric,1 special character (!@#$%^&*]) and must be 8 characters or longer.").matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})")
-]
+  check('name')
+    .isLength({ min: 5 })
+    .withMessage('Name must be at least 5 characters long'),
+  check('username')
+    .isLength({ min: 3, max: 10 })
+    .withMessage('Username must be between 3 and 10 characters'),
+  check('email')
+    .isEmail()
+    .withMessage('Must be a valid email address'),
+  check('password')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})/)
+    .withMessage(
+      'Password must contain 1 lowercase, 1 uppercase, 1 number, 1 special character, and be at least 8 characters long'
+    )
+];
 
+// Signin validator
+const usersigninvalidator = [
+  check('email')
+    .isEmail()
+    .withMessage('Must be a valid email address')
+];
+
+// Forgot password validator
+const forgotPasswordValidator = [
+  check('email')
+    .notEmpty()
+    .isEmail()
+    .withMessage('Must be a valid email address')
+];
+
+// Reset password validator
 const resetPasswordValidator = [
-    check("newPassword", "The password must contain at least 1 lowercase, 1 uppercase, 1 numeric,1 special character (!@#$%^&*]) and must be 8 characters or longer.").matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})")
-]
+  check('newPassword')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})/)
+    .withMessage(
+      'Password must contain 1 lowercase, 1 uppercase, 1 number, 1 special character, and be at least 8 characters long'
+    )
+];
 
+// ======================= Routes =======================
 
-const usersigninvalidator = [ check('email').isEmail().withMessage('Must be a valid email address') ]
-const forgotPasswordValidator = [ check('email').not().isEmpty().isEmail().withMessage('Must be a valid email address')  ];
-
-
-
-
+// Pre-signup: validate and send activation email
 router.post('/pre-signup', usersignupvalidator, runvalidation, preSignup);
-router.post('/signup', signup)
-router.post('/signin', usersigninvalidator, runvalidation, signin)
+
+// Signup: finalize account creation with token
+router.post('/signup', signup);
+
+// Signin: login user
+router.post('/signin', usersigninvalidator, runvalidation, signin);
+
+// Signout: logout user
 router.get('/signout', signout);
 
-
+// Forgot password: send reset link
 router.put('/forgot-password', forgotPasswordValidator, runvalidation, forgotPassword);
+
+// Reset password: update password
 router.put('/reset-password', resetPasswordValidator, runvalidation, resetPassword);
-
-
 
 export default router;
