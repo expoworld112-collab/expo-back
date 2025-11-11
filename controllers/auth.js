@@ -1,7 +1,8 @@
+// auth.js
 import fetch from 'isomorphic-fetch';
 import cookie from 'js-cookie';
-import { API } from '../config';
 import Router from 'next/router';
+import { API } from '../config';
 
 // ========================
 // HANDLE SESSION EXPIRATION
@@ -22,7 +23,6 @@ export const handleResponse = response => {
 // ========================
 export const signup = async (user) => {
     try {
-        // Validate email
         if (!user?.email || !/\S+@\S+\.\S+/.test(user.email)) {
             throw new Error("Invalid or missing email address");
         }
@@ -33,7 +33,8 @@ export const signup = async (user) => {
                 "Accept": "application/json",
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(user)
+            body: JSON.stringify(user),
+            credentials: 'include' // important if using cookies
         });
 
         const text = await response.text();
@@ -61,7 +62,6 @@ export const signup = async (user) => {
 // ========================
 export const signin = async (user) => {
     try {
-        // Validate inputs
         if (!user?.email || !user?.password) {
             throw new Error("Email and password are required");
         }
@@ -70,11 +70,15 @@ export const signin = async (user) => {
 
         const response = await fetch(`${API}/signin`, {
             method: 'POST',
-            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify(user)
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(user),
+            credentials: 'include' // important for cookie/session auth
         });
 
-        const text = await response.text(); // get raw response
+        const text = await response.text();
         console.log("Signin raw response:", text);
 
         let data;
@@ -104,7 +108,10 @@ export const signout = async (next) => {
     removeLocalStorage('user');
 
     try {
-        const response = await fetch(`${API}/signout`, { method: 'GET' });
+        await fetch(`${API}/signout`, {
+            method: 'GET',
+            credentials: 'include'
+        });
         console.log('Signout success');
     } catch (err) {
         console.error('Signout error:', err);
@@ -180,7 +187,8 @@ export const forgotPassword = async (email) => {
         const response = await fetch(`${API}/forgot-password`, {
             method: 'PUT',
             headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify(email)
+            body: JSON.stringify(email),
+            credentials: 'include'
         });
 
         const data = await response.json();
@@ -196,7 +204,8 @@ export const resetPassword = async (resetInfo) => {
         const response = await fetch(`${API}/reset-password`, {
             method: 'PUT',
             headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify(resetInfo)
+            body: JSON.stringify(resetInfo),
+            credentials: 'include'
         });
 
         const data = await response.json();
