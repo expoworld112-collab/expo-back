@@ -1,4 +1,3 @@
-// index.js
 import express from "express";
 import morgan from "morgan";
 import bodyParser from "body-parser";
@@ -34,13 +33,12 @@ const port = PORT || 8000;
 const app = express();
 
 // ---------------------------
-// CORS Setup (robust for Vercel + frontend)
+// CORS Setup
 // ---------------------------
 const allowedOrigins = ["https://expo-front-eight.vercel.app"];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       return callback(new Error("CORS not allowed"), false);
@@ -48,10 +46,9 @@ app.use(cors({
     return callback(null, true);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  credentials: true, // important for cookies/auth headers
+  credentials: true,
 }));
 
-// Handle preflight OPTIONS requests for all routes
 app.options("*", cors());
 
 // ---------------------------
@@ -79,7 +76,6 @@ app.get('/', (req, res) => res.json("Backend index"));
 // MongoDB Connection
 // ---------------------------
 mongoose.set("strictQuery", true);
-
 console.log("Connecting to MongoDB:", MONGO_URI);
 
 mongoose.connect(MONGO_URI, {
@@ -92,14 +88,13 @@ mongoose.connect(MONGO_URI, {
 // ---------------------------
 // Session setup
 // ---------------------------
-// ⚠️ On Vercel, secure cookies work only on HTTPS
 app.use(session({
   secret: GOOGLE_CLIENT_SECRET,
   resave: false,
   saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === "production", // only true in production
-    sameSite: 'None', // needed for cross-site cookies
+    secure: process.env.NODE_ENV === "production",
+    sameSite: 'None',
     httpOnly: true
   }
 }));
@@ -138,7 +133,6 @@ app.get("/auth/google/callback", passport.authenticate("google", {
   failureRedirect: `${FRONTEND}/signin`
 }));
 
-// Login success route
 app.get("/login/success", async (req, res) => {
   if (req.user) {
     const token = jwt.sign({ _id: req.user._id }, "Div12@", { expiresIn: '10d' });
@@ -148,7 +142,6 @@ app.get("/login/success", async (req, res) => {
   }
 });
 
-// Logout route
 app.get("/logout", (req, res, next) => {
   req.logout(err => {
     if (err) return next(err);
@@ -157,6 +150,9 @@ app.get("/logout", (req, res, next) => {
 });
 
 // ---------------------------
-// Start server
+// ❌ Remove app.listen()
 // ---------------------------
-app.listen(port, () => console.log(`Server is running on port ${port}`));
+// app.listen(port, () => console.log(`Server running on port ${port}`));
+
+// ✅ Export the app for serverless use
+export default app;
