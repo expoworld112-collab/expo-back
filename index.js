@@ -4,14 +4,19 @@ import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import mongoose from "mongoose";
+import dotenv from "dotenv";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth2";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
+import bcrypt from "bcrypt";
+import nodemailer from "nodemailer";
 
 // Load environment variables
 dotenv.config({ path: './.env' });
+
+// Import models
+import User from "./models/user.js";
 
 // Import routes
 import blogRoutes from "./routes/blog.js";
@@ -23,11 +28,7 @@ import formRoutes from "./routes/form.js";
 import ImageRoutes from "./routes/images.js";
 import storyRoutes from "./routes/slides.js";
 
-// Import models and config
-import User from "./models/user.js";
-import { FRONTEND } from "./config.js";
-
-const { MONGO_URI, PORT, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
+const { MONGO_URI, PORT, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS } = process.env;
 const port = PORT || 8000;
 
 const app = express();
@@ -36,19 +37,17 @@ const app = express();
 // CORS Setup
 // ---------------------------
 const allowedOrigins = ["https://expo-front-eight.vercel.app"];
-
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
+    if (!origin) return callback(null, true); // allow Postman, mobile apps
+    if (!allowedOrigins.includes(origin)) {
       return callback(new Error("CORS not allowed"), false);
     }
     return callback(null, true);
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  credentials: true,
+  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
+  credentials: true
 }));
-
 app.options("*", cors());
 
 // ---------------------------
@@ -76,83 +75,63 @@ app.get('/', (req, res) => res.json("Backend index"));
 // MongoDB Connection
 // ---------------------------
 mongoose.set("strictQuery", true);
-console.log("Connecting to MongoDB:", MONGO_URI);
-
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log("DB connected"))
-.catch(err => console.log("DB Error =>", err));
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("DB connected"))
+  .catch(err => console.log("DB Error =>", err));
 
 // ---------------------------
-// Session setup
+// Nodemailer setup
 // ---------------------------
-app.use(session({
-  secret: GOOGLE_CLIENT_SECRET,
-  resave: false,
-  saveUninitialized: true,
-  cookie: {
-    secure: process.env.NODE_ENV === "production",
-    sameSite: 'None',
-    httpOnly: true
+const transporter = nodemailer.createTransport({
+  service: "Gmail",
+  auth: {
+    user: SMTP_USER,
+    pass: SMTP_PASS
   }
-}));
+});
 
 // ---------------------------
-// Passport Google OAuth
+// PreSignup Route
 // ---------------------------
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.use(new GoogleStrategy({
-  clientID: GOOGLE_CLIENT_ID,
-  clientSecret: GOOGLE_CLIENT_SECRET,
-  callbackURL: "/auth/google/callback",
-  scope: ["profile", "email"]
-},
-async (accessToken, refreshToken, profile, done) => {
+app.post("/api/pre-signup", async (req, res) => {
   try {
-    let user = await User.findOne({ email: profile.emails[0].value }, "email username name profile role");
-    return done(null, user);
-  } catch (error) {
-    return done(error, null);
-  }
-}));
+    const { name, username, email, password } = req.body;
 
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((user, done) => done(null, user));
+    // Check if user exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email is taken" });
+    }
 
-// ---------------------------
-// Google OAuth Routes
-// ---------------------------
-app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-app.get("/auth/google/callback", passport.authenticate("google", {
-  successRedirect: FRONTEND,
-  failureRedirect: `${FRONTEND}/signin`
-}));
+    // Generate activation token
+    const token = jwt.sign(
+      { name, username, email, password: hashedPassword },
+      JWT_ACCOUNT_ACTIVATION,
+      { expiresIn: '10m' }
+    );
 
-app.get("/login/success", async (req, res) => {
-  if (req.user) {
-    const token = jwt.sign({ _id: req.user._id }, "Div12@", { expiresIn: '10d' });
-    res.status(200).json({ user: req.user, token });
-  } else {
-    res.status(400).json({ message: "Not Authorized" });
+    // Send email
+    const mailOptions = {
+      from: SMTP_USER,
+      to: email,
+      subject: "Account activation link",
+      html: `<p>Click to activate your account: <a href="${FRONTEND}/auth/account/activate/${token}">Activate</a></p>`
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ message: `Email has been sent to ${email}. Follow the instructions to activate your account.` });
+
+  } catch (err) {
+    console.error("PreSignup Error:", err);
+    res.status(400).json({ error: err.message });
   }
 });
 
-app.get("/logout", (req, res, next) => {
-  req.logout(err => {
-    if (err) return next(err);
-    res.redirect(`${FRONTEND}/signin`);
-  });
-});
-
 // ---------------------------
-// ❌ Remove app.listen()
+// Export for serverless
 // ---------------------------
-// app.listen(port, () => console.log(`Server running on port ${port}`));
-
-// ✅ Export the app for serverless use
 export default app;
