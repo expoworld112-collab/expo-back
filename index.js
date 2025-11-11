@@ -1,4 +1,3 @@
-// index.js
 import express from "express";
 import morgan from "morgan";
 import bodyParser from "body-parser";
@@ -11,95 +10,50 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth2";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
-// Load environment variables
 dotenv.config({ path: './.env' });
 
-// Import routes
-import blogRoutes from "./routes/blog.js";
 import authRoutes from "./routes/auth.js";
-import userRoutes from "./routes/user.js";
-import categoryRoutes from "./routes/category.js";
-import tagRoutes from "./routes/tag.js";
-import formRoutes from "./routes/form.js";
-import ImageRoutes from "./routes/images.js";
-import storyRoutes from "./routes/slides.js";
 
-// Import models and config
-import User from "./models/user.js";
-import { FRONTEND } from "./config.js";
-
-const { MONGO_URI, PORT, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
+const { MONGO_URI, PORT, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, FRONTEND } = process.env;
 const port = PORT || 8000;
 
 const app = express();
 
 // ---------------------------
-// CORS Setup (robust for Vercel + frontend)
+// CORS Setup (robust for frontend + credentials)
 // ---------------------------
-const allowedOrigins = ["https://expo-front-eight.vercel.app"];
+const allowedOrigins = [FRONTEND, "https://expo-front-eight.vercel.app"];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      return callback(new Error("CORS not allowed"), false);
-    }
+    if (!origin) return callback(null, true); // allow Postman or curl
+    if (allowedOrigins.indexOf(origin) === -1) return callback(new Error("CORS not allowed"));
     return callback(null, true);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  credentials: true, // important for cookies/auth headers
+  credentials: true, // must enable for cookies
 }));
 
-// Handle preflight OPTIONS requests for all routes
-app.options("*", cors());
+// Enable preflight requests for all routes
+app.options("*", cors({ origin: allowedOrigins, credentials: true }));
 
 // ---------------------------
 // Middleware
 // ---------------------------
-app.use(morgan('dev'));
+app.use(morgan("dev"));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
 // ---------------------------
-// Routes
-// ---------------------------
-app.use('/api', blogRoutes);
-app.use('/api', authRoutes);
-app.use('/api', userRoutes);
-app.use('/api', categoryRoutes);
-app.use('/api', tagRoutes);
-app.use('/api', formRoutes);
-app.use('/api', ImageRoutes);
-app.use('/api', storyRoutes);
-
-app.get('/', (req, res) => res.json("Backend index"));
-
-// ---------------------------
-// MongoDB Connection
-// ---------------------------
-mongoose.set("strictQuery", true);
-
-console.log("Connecting to MongoDB:", MONGO_URI);
-
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log("DB connected"))
-.catch(err => console.log("DB Error =>", err));
-
-// ---------------------------
 // Session setup
 // ---------------------------
-// ⚠️ On Vercel, secure cookies work only on HTTPS
 app.use(session({
   secret: GOOGLE_CLIENT_SECRET,
   resave: false,
   saveUninitialized: true,
   cookie: {
-    secure: process.env.NODE_ENV === "production", // only true in production
-    sameSite: 'None', // needed for cross-site cookies
+    secure: process.env.NODE_ENV === "production", // only true on HTTPS
+    sameSite: 'None',
     httpOnly: true
   }
 }));
@@ -129,34 +83,19 @@ passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
 // ---------------------------
-// Google OAuth Routes
+// Routes
 // ---------------------------
-app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+app.use("/api", authRoutes);
 
-app.get("/auth/google/callback", passport.authenticate("google", {
-  successRedirect: FRONTEND,
-  failureRedirect: `${FRONTEND}/signin`
-}));
-
-// Login success route
-app.get("/login/success", async (req, res) => {
-  if (req.user) {
-    const token = jwt.sign({ _id: req.user._id }, "Div12@", { expiresIn: '10d' });
-    res.status(200).json({ user: req.user, token });
-  } else {
-    res.status(400).json({ message: "Not Authorized" });
-  }
-});
-
-// Logout route
-app.get("/logout", (req, res, next) => {
-  req.logout(err => {
-    if (err) return next(err);
-    res.redirect(`${FRONTEND}/signin`);
-  });
-});
+// ---------------------------
+// MongoDB Connection
+// ---------------------------
+mongoose.set("strictQuery", true);
+mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("DB connected"))
+  .catch(err => console.log("DB Error =>", err));
 
 // ---------------------------
 // Start server
 // ---------------------------
-app.listen(port, () => console.log(`Server is running on port ${port}`));
+app.listen(port, () => console.log(`Server running on port ${port}`));
