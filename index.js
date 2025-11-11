@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import morgan from "morgan";
 import bodyParser from "body-parser";
@@ -5,9 +6,6 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth2";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
@@ -28,6 +26,7 @@ import formRoutes from "./routes/form.js";
 import ImageRoutes from "./routes/images.js";
 import storyRoutes from "./routes/slides.js";
 
+// Destructure environment variables
 const { MONGO_URI, PORT, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS } = process.env;
 const port = PORT || 8000;
 
@@ -39,7 +38,7 @@ const app = express();
 const allowedOrigins = ["https://expo-front-eight.vercel.app"];
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // allow Postman, mobile apps
+    if (!origin) return callback(null, true); // allow Postman or mobile apps
     if (!allowedOrigins.includes(origin)) {
       return callback(new Error("CORS not allowed"), false);
     }
@@ -48,6 +47,8 @@ app.use(cors({
   methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
   credentials: true
 }));
+
+// Handle preflight requests for all routes
 app.options("*", cors());
 
 // ---------------------------
@@ -58,20 +59,6 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 // ---------------------------
-// Routes
-// ---------------------------
-app.use('/api', blogRoutes);
-app.use('/api', authRoutes);
-app.use('/api', userRoutes);
-app.use('/api', categoryRoutes);
-app.use('/api', tagRoutes);
-app.use('/api', formRoutes);
-app.use('/api', ImageRoutes);
-app.use('/api', storyRoutes);
-
-app.get('/', (req, res) => res.json("Backend index"));
-
-// ---------------------------
 // MongoDB Connection
 // ---------------------------
 mongoose.set("strictQuery", true);
@@ -80,7 +67,7 @@ mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .catch(err => console.log("DB Error =>", err));
 
 // ---------------------------
-// Nodemailer setup
+// Nodemailer Setup
 // ---------------------------
 const transporter = nodemailer.createTransport({
   service: "Gmail",
@@ -91,8 +78,10 @@ const transporter = nodemailer.createTransport({
 });
 
 // ---------------------------
-// PreSignup Route
+// Routes
 // ---------------------------
+
+// PreSignup route
 app.post("/api/pre-signup", async (req, res) => {
   try {
     const { name, username, email, password } = req.body;
@@ -106,19 +95,24 @@ app.post("/api/pre-signup", async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate activation token
+    // Generate JWT token for activation
     const token = jwt.sign(
       { name, username, email, password: hashedPassword },
       JWT_ACCOUNT_ACTIVATION,
       { expiresIn: '10m' }
     );
 
-    // Send email
+    // Email options
     const mailOptions = {
       from: SMTP_USER,
       to: email,
       subject: "Account activation link",
-      html: `<p>Click to activate your account: <a href="${FRONTEND}/auth/account/activate/${token}">Activate</a></p>`
+      html: `
+        <p>Hi ${name},</p>
+        <p>Click the link below to activate your account:</p>
+        <a href="${FRONTEND}/auth/account/activate/${token}">Activate Account</a>
+        <p>Link expires in 10 minutes.</p>
+      `
     };
 
     await transporter.sendMail(mailOptions);
@@ -131,7 +125,19 @@ app.post("/api/pre-signup", async (req, res) => {
   }
 });
 
+// Other routes
+app.use('/api', blogRoutes);
+app.use('/api', authRoutes);
+app.use('/api', userRoutes);
+app.use('/api', categoryRoutes);
+app.use('/api', tagRoutes);
+app.use('/api', formRoutes);
+app.use('/api', ImageRoutes);
+app.use('/api', storyRoutes);
+
+app.get('/', (req, res) => res.json("Backend index"));
+
 // ---------------------------
-// Export for serverless
+// Export app for serverless
 // ---------------------------
 export default app;
