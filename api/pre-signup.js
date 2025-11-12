@@ -5,15 +5,9 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import User from "../../models/user.js";
 
-dotenv.config({ path: './.env' });
+dotenv.config({ path: "./.env" });
 
 const { MONGO_URI, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS } = process.env;
-
-// Connect to MongoDB (if not already connected)
-if (!mongoose.connection.readyState) {
-  mongoose.set("strictQuery", true);
-  mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
-}
 
 // Nodemailer transporter
 const transporter = nodemailer.createTransport({
@@ -21,62 +15,64 @@ const transporter = nodemailer.createTransport({
   auth: { user: SMTP_USER, pass: SMTP_PASS },
 });
 
+
 export default async function handler(req, res) {
-  // ---------------------------
-  // CORS headers
-  // ---------------------------
-  const allowedOrigin = "https://expo-front-eight.vercel.app";
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  // --- ALWAYS set CORS headers first
+  const allowedOrigins = ["https://expo-front-eight.vercel.app"];
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  // Handle preflight request
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-  // Only allow POST
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+  // --- Make sure env variables exist
+  if (!process.env.MONGO_URI || !process.env.JWT_ACCOUNT_ACTIVATION) {
+    return res.status(500).json({ error: "Missing env variables" });
   }
 
   try {
-    const { name, username, email, password } = req.body;
-
-    if (!name || !username || !email || !password) {
-      return res.status(400).json({ error: "All fields are required" });
+    // --- Connect to DB (await!)
+    if (!mongoose.connection.readyState) {
+      await mongoose.connect(process.env.MONGO_URI, { 
+        useNewUrlParser: true, 
+        useUnifiedTopology: true 
+      });
     }
+
+    // --- Only POST
+    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+    const { name, username, email, password } = req.body;
+    if (!name || !username || !email || !password) return res.status(400).json({ error: "All fields required" });
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email is already taken" });
-    }
+    if (existingUser) return res.status(400).json({ error: "Email already taken" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const token = jwt.sign({ name, username, email, password: hashedPassword }, process.env.JWT_ACCOUNT_ACTIVATION, { expiresIn: "10m" });
 
-    const token = jwt.sign(
-      { name, username, email, password: hashedPassword },
-      JWT_ACCOUNT_ACTIVATION,
-      { expiresIn: "10m" }
-    );
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
 
-    const mailOptions = {
-      from: SMTP_USER,
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
       to: email,
       subject: "Activate your account",
-      html: `
-        <p>Hi ${name},</p>
-        <p>Click the link below to activate your account:</p>
-        <a href="${FRONTEND}/auth/account/activate/${token}">Activate Account</a>
-      `,
-    };
+      html: `<a href="${process.env.FRONTEND}/auth/account/activate/${token}">Activate</a>`,
+    });
 
-    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: `Email sent to ${email}` });
 
-    return res.status(200).json({ message: `Email sent to ${email}. Check inbox to activate account.` });
   } catch (err) {
-    console.error("PreSignup Error:", err);
-    return res.status(500).json({ error: "Something went wrong. Please try again." });
+    console.error("PreSignup error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 }
