@@ -9,7 +9,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 
-// Load environment variables
+// Load env
 dotenv.config({ path: "./.env" });
 
 // Import models
@@ -29,16 +29,16 @@ const { MONGO_URI, PORT, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS 
 const app = express();
 const port = PORT || 8000;
 
-// ------------------------------------------------------
-// ✅ UNIVERSAL CORS FIX (Works on Vercel too)
-// ------------------------------------------------------
+// ---------------------------------------
+// ✅ MANUAL CORS FIX
+// ---------------------------------------
 app.use((req, res, next) => {
   const allowedOrigins = [
     "https://expo-front-eight.vercel.app",
-    "http://localhost:3000"
+    "http://localhost:3000",
   ];
-
   const origin = req.headers.origin;
+
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
@@ -47,7 +47,7 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  // ✅ IMPORTANT: handle preflight requests globally
+  // ✅ End preflight requests early
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -55,25 +55,25 @@ app.use((req, res, next) => {
   next();
 });
 
-// ------------------------------------------------------
+// ---------------------------------------
 // Middleware
-// ------------------------------------------------------
+// ---------------------------------------
 app.use(morgan("dev"));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// ------------------------------------------------------
+// ---------------------------------------
 // MongoDB
-// ------------------------------------------------------
+// ---------------------------------------
 mongoose.set("strictQuery", true);
 mongoose
   .connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .catch((err) => console.error("❌ MongoDB error:", err));
 
-// ------------------------------------------------------
+// ---------------------------------------
 // Nodemailer
-// ------------------------------------------------------
+// ---------------------------------------
 const transporter = nodemailer.createTransport({
   service: "Gmail",
   auth: {
@@ -82,11 +82,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ------------------------------------------------------
+// ---------------------------------------
 // Routes
-// ------------------------------------------------------
+// ---------------------------------------
 
-// ✅ PRE-SIGNUP
+// Pre-signup route
 app.post("/api/pre-signup", async (req, res) => {
   try {
     const { name, username, email, password } = req.body;
@@ -128,7 +128,7 @@ app.post("/api/pre-signup", async (req, res) => {
   }
 });
 
-// ✅ Other routes
+// Other routes
 app.use("/api", blogRoutes);
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
@@ -138,7 +138,7 @@ app.use("/api", formRoutes);
 app.use("/api", ImageRoutes);
 app.use("/api", storyRoutes);
 
-// ✅ Base route
-app.get("/", (req, res) => res.json({ message: "Backend is running ✅" }));
+// Root route
+app.get("/", (req, res) => res.json({ message: "Backend running ✅" }));
 
 export default app;
