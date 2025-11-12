@@ -10,6 +10,7 @@ import {
   preSignup
 } from "../controllers/auth.js";
 import { runvalidation } from "../validators/index.js";
+import api from './api'; // depending on folder structure
 
 const router = express.Router();
 

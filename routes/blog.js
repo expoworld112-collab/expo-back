@@ -16,7 +16,7 @@ router.get('/blog/related/:slug', relatedposts);
 // routes/blog.js
 router.get('/allblogslugs', async (req, res) => {
   try {
-    const blogs = await Blog.find().select('slug');
+    const blogs = await blogs.find().select('slug');
     res.json(blogs);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
