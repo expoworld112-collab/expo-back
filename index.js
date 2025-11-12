@@ -27,7 +27,7 @@ const { MONGO_URI, PORT, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS 
 // ✅ FIXED: Manual CORS headers (always works on Vercel)
 // ---------------------------
 app.use((req, res, next) => {
-  const allowedOrigin = "https://expo-front-eight.vercel.app";
+  const allowedOrigin = "https://expo-front-q575.vercel.app";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
