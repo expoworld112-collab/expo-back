@@ -4,6 +4,7 @@ import {
   signup,
   signin,
   signout,
+  preSignupController,
   requireSignin,
   forgotPassword,
   resetPassword,
@@ -64,6 +65,7 @@ router.post('/pre-signup', usersignupvalidator, runvalidation, preSignup);
 
 // Signup: finalize account creation with token
 router.post('/signup', signup);
+router.post('/pre-signup', preSignupController);
 
 // Signin: login user
 router.post('/signin', usersigninvalidator, runvalidation, signin);
