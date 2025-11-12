@@ -1,4 +1,5 @@
 import express from "express";
+import serverless from "serverless-http";
 import morgan from "morgan";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
@@ -18,25 +19,21 @@ import formRoutes from "./routes/form.js";
 import ImageRoutes from "./routes/images.js";
 import storyRoutes from "./routes/slides.js";
 
-dotenv.config({ path: './.env' });
+dotenv.config({ path: "./.env" });
 
 const app = express();
-const { MONGO_URI, PORT, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS } = process.env;
+const { MONGO_URI, JWT_ACCOUNT_ACTIVATION, FRONTEND, SMTP_USER, SMTP_PASS } = process.env;
 
 // ---------------------------
-// ✅ FIXED: Manual CORS headers (always works on Vercel)
+// ✅ CORS
 // ---------------------------
 app.use((req, res, next) => {
-  const allowedOrigin = "https://expo-front-q575.vercel.app";
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Access-Control-Allow-Origin", "https://expo-front-q575.vercel.app");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end(); // handle preflight 
-  }
-
+  if (req.method === "OPTIONS") return res.status(200).end();
   next();
 });
 
@@ -67,46 +64,12 @@ const transporter = nodemailer.createTransport({
 // ---------------------------
 // Routes
 // ---------------------------
-app.post("/api/pre-signup", async (req, res) => {
-  try {
-    const { name, username, email, password } = req.body;
-
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email is taken" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const token = jwt.sign(
-      { name, username, email, password: hashedPassword },
-      JWT_ACCOUNT_ACTIVATION,
-      { expiresIn: "10m" }
-    );
-
-    const mailOptions = {
-      from: SMTP_USER,
-      to: email,
-      subject: "Account activation link",
-      html: `
-        <p>Hi ${name},</p>
-        <p>Click the link below to activate your account:</p>
-        <a href="${FRONTEND}/auth/account/activate/${token}">Activate Account</a>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    res.json({ message: `Email sent to ${email}. Check inbox to activate account.` });
-  } catch (err) {
-    console.error("PreSignup Error:", err);
-    res.status(500).json({ error: "Something went wrong. Please try again." });
-  }
-});
+app.get("/", (req, res) => res.json({ message: "Backend is live ✅" }));
 
 app.get("/blogs-categories-tags", (req, res) => {
   const blogs = [
-    { id: 1, title: "Travel to Japan", slug: "travel-to-japan", date: "2025-11-12T10:00:00Z" },
-    { id: 2, title: "Backpacking in Europe", slug: "backpacking-in-europe", date: "2025-11-10T08:30:00Z" },
+    { id: 1, title: "Travel to Japan", slug: "travel-to-japan" },
+    { id: 2, title: "Backpacking in Europe", slug: "backpacking-in-europe" },
   ];
   const categories = [{ id: 1, name: "Travel" }, { id: 2, name: "Adventure" }];
   const tags = [{ id: 1, name: "Japan" }, { id: 2, name: "Europe" }, { id: 3, name: "Tips" }];
@@ -114,8 +77,6 @@ app.get("/blogs-categories-tags", (req, res) => {
   res.json({ blogs, categories, tags });
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-// Other routes
 app.use("/api", blogRoutes);
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
@@ -125,6 +86,8 @@ app.use("/api", formRoutes);
 app.use("/api", ImageRoutes);
 app.use("/api", storyRoutes);
 
-app.get("/", (req, res) => res.json({ message: "Backend index — CORS fixed ✅" }));
-
+// ---------------------------
+// ✅ Export serverless handler for Vercel
+// ---------------------------
+export const handler = serverless(app);
 export default app;
