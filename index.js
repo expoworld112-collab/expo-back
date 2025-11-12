@@ -36,20 +36,29 @@ const app = express();
 // CORS Setup
 // ---------------------------
 const allowedOrigins = ["https://expo-front-eight.vercel.app"];
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // allow Postman or mobile apps
-    if (!allowedOrigins.includes(origin)) {
-      return callback(new Error("CORS not allowed"), false);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow no-origin (Postman, mobile apps)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      console.warn(`❌ Blocked by CORS: ${origin}`);
+      return callback(new Error("Not allowed by CORS"));
     }
-    return callback(null, true);
   },
-  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
-  credentials: true
-}));
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200, // for legacy browsers
+};
+
+app.use(cors(corsOptions));
 
 // Handle preflight requests for all routes
-app.options("*", cors());
+app.options("*", cors(corsOptions));
 
 // ---------------------------
 // Middleware
