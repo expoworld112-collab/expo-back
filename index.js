@@ -103,6 +103,18 @@ app.post("/api/pre-signup", async (req, res) => {
   }
 });
 
+app.get("/blogs-categories-tags", (req, res) => {
+  const blogs = [
+    { id: 1, title: "Travel to Japan", slug: "travel-to-japan", date: "2025-11-12T10:00:00Z" },
+    { id: 2, title: "Backpacking in Europe", slug: "backpacking-in-europe", date: "2025-11-10T08:30:00Z" },
+  ];
+  const categories = [{ id: 1, name: "Travel" }, { id: 2, name: "Adventure" }];
+  const tags = [{ id: 1, name: "Japan" }, { id: 2, name: "Europe" }, { id: 3, name: "Tips" }];
+
+  res.json({ blogs, categories, tags });
+});
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 // Other routes
 app.use("/api", blogRoutes);
 app.use("/api", authRoutes);
