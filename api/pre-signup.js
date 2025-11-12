@@ -1,29 +1,39 @@
 // api/pre-signup.js
 export default async function handler(req, res) {
-  // 1️⃣ Set CORS headers for all requests
-  res.setHeader("Access-Control-Allow-Origin", "https://expo-front-eight.vercel.app"); // frontend URL
+  // ✅ Allowed frontend origins
+  const allowedOrigins = [
+    "https://expo-front-eight.vercel.app", // production
+    "http://localhost:3000"  // local dev
+  ];
+
+  const origin = req.headers.origin;
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
+  // Allowed methods and headers
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // 2️⃣ Handle preflight OPTIONS request
+  // ✅ Handle preflight OPTIONS request
   if (req.method === "OPTIONS") {
-    return res.status(200).end(); // required for preflight
+    return res.status(200).end();
   }
 
-  // 3️⃣ Only allow POST
+  // Only allow POST for actual requests
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   try {
     const data = req.body;
     console.log("Pre-signup data:", data);
 
-    // TODO: Add your signup logic (DB, email, etc.)
-
+    // Your signup logic here
     return res.status(200).json({ message: "Pre-signup successful" });
   } catch (error) {
-    console.error(error);
+    console.error("Pre-signup error:", error);
     return res.status(500).json({ error: "Server error" });
   }
 }
