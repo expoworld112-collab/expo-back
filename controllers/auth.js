@@ -20,36 +20,24 @@ const transporter = nodemailer.createTransport({
 });
 
 // ======================= Pre-signup =======================
-export const preSignup = async (req, res) => {
+export const preSignup = async (userData) => {
   try {
-    const { name, username, email, password } = req.body;
+    const response = await fetch(`${API}/auth/pre-signup`, { // note "/auth/pre-signup"
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData),
+      credentials: "include",
+    });
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email is taken" });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Request failed with status ${response.status}`);
     }
 
-    const token = jwt.sign(
-      { name, username, email, password },
-      process.env.JWT_ACCOUNT_ACTIVATION,
-      { expiresIn: "10m" }
-    );
-
-    const mailOptions = {
-      from: process.env.SMTP_USER,
-      to: email,
-      subject: "Account activation link",
-      html: `<p>Click the link to activate your account: <a href="${process.env.MAIN_URL}/auth/account/activate/${token}">${process.env.MAIN_URL}/auth/account/activate/${token}</a></p>`
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    res.json({
-      message: `Email has been sent to ${email}. Follow the instructions to activate your account.`
-    });
+    return await response.json();
   } catch (err) {
-    console.error("PreSignup Error:", err);
-    res.status(400).json({ error: err.message });
+    console.error("Pre-signup error:", err.message);
+    return { error: err.message };
   }
 };
 
