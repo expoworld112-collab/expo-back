@@ -1,29 +1,12 @@
 import express from "express";
-import mongoose from "mongoose";
 import dotenv from "dotenv";
-import morgan from "morgan";
-import cookieParser from "cookie-parser";
-import bodyParser from "body-parser";
-import cors from "cors";
-
-// Routes
+import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 
-dotenv.config();
+dotenv.config({ path: "./.env" });
 
 const app = express();
-const PORT = process.env.PORT || 8000;
-
-// ✅ CORS setup
-app.use(cors({
-  origin: "https://expo-front-q575.vercel.app", // your frontend
-  credentials: true,
-}));
-
-// Middleware
-app.use(morgan("dev"));
-app.use(bodyParser.json());
-app.use(cookieParser());
+app.use(express.json());
 
 // MongoDB connection
 mongoose.set("strictQuery", true);
@@ -32,7 +15,7 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
 })
   .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .catch(err => console.error("DB Error:", err));
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -40,7 +23,6 @@ app.use("/api/auth", authRoutes);
 // Test route
 app.get("/", (req, res) => res.json({ message: "Backend running ✅" }));
 
-// Start server
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
-export default app;
+// Server
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
