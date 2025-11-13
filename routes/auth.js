@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
@@ -18,23 +19,37 @@ const transporter = nodemailer.createTransport({
 // --- Pre-signup route
 router.post("/pre-signup", async (req, res) => {
   try {
+    // Connect to MongoDB if not connected
+    if (!mongoose.connection.readyState) {
+      await mongoose.connect(process.env.MONGO_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      });
+    }
+
     const { name, username, email, password } = req.body;
 
-    if (!name || !username || !email || !password)
+    if (!name || !username || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
+    }
 
+    // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser)
+    if (existingUser) {
       return res.status(400).json({ error: "Email already taken" });
+    }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create activation token (expires in 10 minutes)
     const token = jwt.sign(
       { name, username, email, password: hashedPassword },
       process.env.JWT_ACCOUNT_ACTIVATION,
       { expiresIn: "10m" }
     );
 
+    // Send activation email
     await transporter.sendMail({
       from: process.env.SMTP_USER,
       to: email,
@@ -46,11 +61,14 @@ router.post("/pre-signup", async (req, res) => {
       `,
     });
 
-    res.status(200).json({ message: `Activation email sent to ${email}` });
+    return res.status(200).json({
+      message: `Activation email sent to ${email}`,
+    });
   } catch (err) {
-    console.error("PreSignup error:", err);
-    res.status(500).json({ error: "Server error" });
+    console.error("PreSignup error:", err.message);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
+// --- Export router
 export default router;

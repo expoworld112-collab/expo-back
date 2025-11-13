@@ -9,17 +9,32 @@ dotenv.config({ path: "./.env" });
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// --- Middleware
-app.use(express.json()); // parse JSON bodies
+// --- Middleware to parse JSON
+app.use(express.json());
 
-// --- CORS setup
+// --- CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND.replace(/\/$/, ""), // remove trailing slash just in case
+];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND,
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow server-to-server or Postman requests
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // allow cookies
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// --- Handle preflight requests for all routes
+app.options("*", cors());
 
 // --- Routes
 app.use("/api/auth", authRoutes);
@@ -36,7 +51,7 @@ app.use((req, res) => {
 
 // --- Global error handler
 app.use((err, req, res, next) => {
-  console.error("Server error:", err);
+  console.error("Server error:", err.message);
   res.status(500).json({ error: "Internal server error" });
 });
 
