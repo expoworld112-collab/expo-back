@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
+import authRoutes from "./routes/auth.js";
 
 import User from "./models/user.js";
 import blogRoutes from "./routes/blog.js";
