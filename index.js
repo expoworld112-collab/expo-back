@@ -1,43 +1,35 @@
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import cors from "cors"; // <-- import cors
+import cors from "cors";
 import authRoutes from "./routes/auth.js";
 
 dotenv.config({ path: "./.env" });
 
 const app = express();
+const PORT = process.env.PORT || 8000;
 
 // --- Middleware
 app.use(express.json()); // parse JSON bodies
 
-// --- CORS configuration
-app.use(cors({
-  origin: "https://expo-front-q575.vercel.app", // your front-end URL
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true, // if you use cookies/auth headers
-}));
-
-// --- MongoDB connection
-mongoose.set("strictQuery", true);
-
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+// --- CORS setup
+app.use(
+  cors({
+    origin: process.env.FRONTEND,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
   })
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+);
 
 // --- Routes
 app.use("/api/auth", authRoutes);
 
-// --- Health check / test route
+// --- Health check route
 app.get("/", (req, res) => {
   res.status(200).json({ message: "Backend running ✅" });
 });
 
-// --- 404 handler for unknown routes
+// --- 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
@@ -48,6 +40,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-// --- Start server
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// --- Start server with MongoDB connection
+const startServer = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("✅ MongoDB connected");
+
+    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  }
+};
+
+startServer();

@@ -1,5 +1,4 @@
 import express from "express";
-import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
@@ -16,46 +15,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// --- Allowed frontend origins
-const allowedOrigins = ["https://expo-front-q575.vercel.app"];
-
-// --- CORS Middleware (safe for serverless/Vercel)
-router.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "POST, GET, OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  // Handle preflight requests
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
-
 // --- Pre-signup route
 router.post("/pre-signup", async (req, res) => {
   try {
-    // Connect to MongoDB if not already connected
-    if (!mongoose.connection.readyState) {
-      await mongoose.connect(process.env.MONGO_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-    }
-
     const { name, username, email, password } = req.body;
 
-    if (!name || !username || !email || !password) {
+    if (!name || !username || !email || !password)
       return res.status(400).json({ error: "All fields are required" });
-    }
 
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser)
@@ -80,12 +46,10 @@ router.post("/pre-signup", async (req, res) => {
       `,
     });
 
-    return res.status(200).json({
-      message: `Activation email sent to ${email}`,
-    });
+    res.status(200).json({ message: `Activation email sent to ${email}` });
   } catch (err) {
     console.error("PreSignup error:", err);
-    return res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
