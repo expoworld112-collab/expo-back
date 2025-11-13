@@ -7,7 +7,7 @@ import {
   requireSignin,
   forgotPassword,
   resetPassword,
-  preSignup
+  // preSignup
 } from "../controllers/auth.js";
 import { runvalidation } from "../validators/index.js";
 
