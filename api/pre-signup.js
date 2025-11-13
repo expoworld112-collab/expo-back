@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     if (existingUser) return res.status(400).json({ error: "Email already taken" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const token = jwt.sign({ name, username, email,p password: hashedPassword }, process.env.JWT_ACCOUNT_ACTIVATION, { expiresIn: "10m" });
+    const token = jwt.sign({ name, username, email, password: hashedPassword }, process.env.JWT_ACCOUNT_ACTIVATION, { expiresIn: "10m" });
 
     const transporter = nodemailer.createTransport({
       service: "Gmail",
