@@ -67,42 +67,42 @@ const transporter = nodemailer.createTransport({
 });
 
 // ✅ Pre-signup route
-app.post("/api/pre-signup", async (req, res) => {
-  try {
-    const { name, username, email, password } = req.body;
+// app.post("/api/pre-signup", async (req, res) => {
+//   try {
+//     const { name, username, email, password } = req.body;
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email is taken" });
-    }
+//     const existingUser = await User.findOne({ email: email.toLowerCase() });
+//     if (existingUser) {
+//       return res.status(400).json({ error: "Email is taken" });
+//     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const token = jwt.sign(
-      { name, username, email, password: hashedPassword },
-      JWT_ACCOUNT_ACTIVATION,
-      { expiresIn: "10m" }
-    );
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const token = jwt.sign(
+//       { name, username, email, password: hashedPassword },
+//       JWT_ACCOUNT_ACTIVATION,
+//       { expiresIn: "10m" }
+//     );
 
-    const mailOptions = {
-      from: SMTP_USER,
-      to: email,
-      subject: "Account activation link",
-      html: `
-        <p>Hi ${name},</p>
-        <p>Click the link below to activate your account:</p>
-        <a href="${FRONTEND}/auth/account/activate/${token}">Activate Account</a>
-      `,
-    };
+//     const mailOptions = {
+//       from: SMTP_USER,
+//       to: email,
+//       subject: "Account activation link",
+//       html: `
+//         <p>Hi ${name},</p>
+//         <p>Click the link below to activate your account:</p>
+//         <a href="${FRONTEND}/auth/account/activate/${token}">Activate Account</a>
+//       `,
+//     };
 
-    await transporter.sendMail(mailOptions);
-    res.json({
-      message: `Email sent to ${email}. Check inbox to activate account.`,
-    });
-  } catch (err) {
-    console.error("PreSignup Error:", err);
-    res.status(500).json({ error: "Something went wrong. Please try again." });
-  }
-});
+//     await transporter.sendMail(mailOptions);
+//     res.json({
+//       message: `Email sent to ${email}. Check inbox to activate account.`,
+//     });
+//   } catch (err) {
+//     console.error("PreSignup Error:", err);
+//     res.status(500).json({ error: "Something went wrong. Please try again." });
+//   }
+// });
 
 // Test route
 app.get("/", (req, res) =>
