@@ -15,7 +15,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Allowed frontend origins
-const allowedOrigins = ["https://expo-front-q575.vercel.app"];
+const allowedOrigins = ["https://expo-front-one.vercel.app/"];
 
 export default async function handler(req, res) {
   const origin = req.headers.origin;
