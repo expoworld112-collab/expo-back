@@ -28,7 +28,7 @@ const connectDB = async () => {
 
 export default async function handler(req, res) {
   // --- CORS headers
-  const allowedOrigins = ["https://expo-front-one.vercel.app"];
+  const allowedOrigins = ["https://expo-front-one.vercel.app"];   
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
