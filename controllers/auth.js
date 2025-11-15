@@ -20,26 +20,66 @@ const transporter = nodemailer.createTransport({
 });
 
 // ======================= Pre-signup =======================
-export const preSignup = async (userData) => {
+// export const preSignup = async (userData) => {
+//   try {
+//     const response = await fetch(`${API}/api/pre-signup`, { // note "/auth/pre-signup"
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify(userData),
+//       credentials: "include",
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json().catch(() => ({}));
+//       throw new Error(errorData.error || `Request failed with status ${response.status}`);
+//     }
+
+//     return await response.json();
+//   } catch (err) {
+//     console.error("Pre-signup error:", err.message);
+//     return { error: err.message };
+//   }
+// };
+export const preSignup = async (req, res) => {
+  const { name, username, email, password } = req.body;
+
+  if (!name || !username || !email || !password) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
   try {
-    const response = await fetch(`${API}/api/pre-signup`, { // note "/auth/pre-signup"
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userData),
-      credentials: "include",
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser)
+      return res.status(400).json({ error: "Email already taken" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const token = jwt.sign(
+      { name, username, email, password: hashedPassword },
+      process.env.JWT_ACCOUNT_ACTIVATION,
+      { expiresIn: "10m" }
+    );
+
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: "Activate your account",
+      html: `
+        <p>Hi ${name},</p>
+        <p>Click below to activate your account:</p>
+        <a href="${process.env.MAIN_URL}/auth/account/activate/${token}">
+          Activate Account
+        </a>
+      `
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Request failed with status ${response.status}`);
-    }
-
-    return await response.json();
+    return res.json({ message: `Activation email sent to ${email}` });
   } catch (err) {
-    console.error("Pre-signup error:", err.message);
-    return { error: err.message };
+    console.error("Pre-signup Error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
+
 
 // ======================= Signup =======================
 export const signup = async (req, res) => {
