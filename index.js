@@ -14,32 +14,35 @@ app.use(express.json());
 
 // --- CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND.replace(/\/$/, ""), // remove trailing slash just in case
+  process.env.FRONTEND?.replace(/\/$/, ""), // Frontend URL from .env
+  "http://localhost:3000",                  // Local development
 ];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // allow server-to-server or Postman requests
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+    origin: (origin, callback) => {
+      // Allow requests with no origin (Postman, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Allow only whitelisted origins
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      // Block other origins
+      callback(new Error(`CORS Error: ${origin} not allowed`));
     },
-    credentials: true, // allow cookies
+    credentials: true, // Allow cookies
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// --- Handle preflight requests for all routes
+// --- Handle preflight requests globally
 app.options("*", cors());
 
 // --- Routes
-app.use("/", authRoutes);
+app.use("/auth", authRoutes);
 
-// --- Health check route
+// --- Health check
 app.get("/", (req, res) => {
   res.status(200).json({ message: "Backend running ✅" });
 });
@@ -52,7 +55,7 @@ app.use((req, res) => {
 // --- Global error handler
 app.use((err, req, res, next) => {
   console.error("Server error:", err.message);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ error: err.message || "Internal server error" });
 });
 
 // --- Start server with MongoDB connection
