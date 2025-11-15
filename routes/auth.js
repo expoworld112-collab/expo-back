@@ -16,40 +16,38 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// --- Pre-signup route
+// --- Middleware to connect to MongoDB
+const connectDB = async () => {
+  if (!mongoose.connection.readyState) {
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+  }
+};
+
+// ==================== Pre-signup ====================
 router.post("/pre-signup", async (req, res) => {
   try {
-    // Connect to MongoDB if not connected
-    if (!mongoose.connection.readyState) {
-      await mongoose.connect(process.env.MONGO_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
-    }
+    await connectDB();
 
     const { name, username, email, password } = req.body;
-
     if (!name || !username || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
+    if (existingUser)
       return res.status(400).json({ error: "Email already taken" });
-    }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create activation token (expires in 10 minutes)
     const token = jwt.sign(
       { name, username, email, password: hashedPassword },
       process.env.JWT_ACCOUNT_ACTIVATION,
       { expiresIn: "10m" }
     );
 
-    // Send activation email
     await transporter.sendMail({
       from: process.env.SMTP_USER,
       to: email,
@@ -61,14 +59,114 @@ router.post("/pre-signup", async (req, res) => {
       `,
     });
 
-    return res.status(200).json({
-      message: `Activation email sent to ${email}`,
-    });
+    res.status(200).json({ message: `Activation email sent to ${email}` });
   } catch (err) {
-    console.error("PreSignup error:", err.message);
-    return res.status(500).json({ error: "Server error" });
+    console.error("PreSignup error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// --- Export router
+// ==================== Signup ====================
+router.post("/signup", async (req, res) => {
+  try {
+    await connectDB();
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: "No token provided" });
+
+    const decoded = jwt.verify(token, process.env.JWT_ACCOUNT_ACTIVATION);
+    const { name, username, email, password } = decoded;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).json({ error: "User already exists. Please signin." });
+
+    const user = new User({ name, username, email, password });
+    await user.save();
+
+    res.json({ message: "Signup successful! Please sign in." });
+  } catch (err) {
+    console.error("Signup error:", err);
+    res.status(401).json({ error: "Expired or invalid link. Signup again." });
+  }
+});
+
+// ==================== Signin ====================
+router.post("/signin", async (req, res) => {
+  try {
+    await connectDB();
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ error: "User not found" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ error: "Email and password do not match" });
+
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+    res.cookie("token", token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    const { _id, name, username, role } = user;
+    res.json({ token, user: { _id, name, username, email, role } });
+  } catch (err) {
+    console.error("Signin error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ==================== Signout ====================
+router.get("/signout", (req, res) => {
+  res.clearCookie("token");
+  res.json({ message: "Signout successful" });
+});
+
+// ==================== Forgot Password ====================
+router.put("/forgot-password", async (req, res) => {
+  try {
+    await connectDB();
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const token = jwt.sign({ _id: user._id }, process.env.JWT_RESET_PASSWORD, { expiresIn: "10m" });
+
+    await user.updateOne({ resetPasswordLink: token });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: "Password Reset",
+      html: `<p>Reset your password using this link:</p>
+             <a href="${process.env.FRONTEND}/auth/password/reset/${token}">Reset Password</a>`
+    });
+
+    res.json({ message: `Password reset email sent to ${email}` });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ==================== Reset Password ====================
+router.put("/reset-password", async (req, res) => {
+  try {
+    await connectDB();
+    const { resetPasswordLink, newPassword } = req.body;
+
+    if (!resetPasswordLink) return res.status(400).json({ error: "No reset link provided" });
+
+    const decoded = jwt.verify(resetPasswordLink, process.env.JWT_RESET_PASSWORD);
+    const user = await User.findOne({ resetPasswordLink });
+    if (!user) return res.status(400).json({ error: "Invalid or expired link" });
+
+    user.password = newPassword;
+    user.resetPasswordLink = "";
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;
