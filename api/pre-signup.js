@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 export default async function handler(req, res) {
   // --- ALWAYS set CORS headers first
-  const allowedOrigins = ["https://expo-front-one.vercel.app//"];
+  const allowedOrigins = ["https://expo-front-one.vercel.app/"];
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
